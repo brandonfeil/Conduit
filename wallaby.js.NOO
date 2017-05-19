@@ -1,0 +1,11 @@
+module.exports = () => {
+    return {
+        files: [
+            "src/*.ts"
+        ],
+
+        tests: [
+            "test/*Spec.ts"
+        ]
+    };
+}

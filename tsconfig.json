@@ -3,9 +3,13 @@
         "target": "es5",
         "module": "commonjs",
         "sourceMap": true,
-        "outDir": "app/js"
+        "noImplicitAny": true
+      //  "outDir": "app/js"
     },
     "include": [
         "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
     ]
 }
