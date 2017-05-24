@@ -2,10 +2,12 @@
 /// <reference types="chai" />
 
 import { expect } from "chai"
-import Startup from "../src/test";
 
-describe("Startup main()", () => {
-    it("should return 0", () => {
-        expect(Startup.main()).to.equal(0);
+import { TestEnum } from "../src/interfaces/TestEnum"
+import { tryIt } from "../src/test"
+
+describe("tryIt", () => {
+    it("should do something", () => {
+        expect(tryIt()).to.equal(TestEnum.This);
     })
 })
