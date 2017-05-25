@@ -7,9 +7,47 @@ import { SignalCollection }     from "./interfaces/SignalCollection"
 // Classes
 import { Conduit }              from "./Conduit"
 
-//module Combinators {
-abstract class Combinator {
+const DeciderOperators: { [funcName: string]: ComparisonFunction } = {
+    lt: (L: number, R: number): boolean => {
+        return (L < R);
+    },
+    gt: (L: number, R: number): boolean => {
+        return (L > R);
+    },
+    lte: (L: number, R: number): boolean => {
+        return (L <= R);
+    },
+    gte: (L: number, R: number): boolean => {
+        return (L >= R);
+    },
+    eq: (L: number, R: number): boolean => {
+        return (L === R);
+    },
+    neq: (L: number, R: number): boolean => {
+        return (L !== R);
+    }
+};
 
+abstract class Combinator {
+    /*
+    *   Members
+    */
+    public inputs: Conduit[];
+    public operands: { 
+        left: Operand;
+        right: Operand;
+        output: Operand;
+    };
+    public output: SignalCollection;
+    public outputOne: boolean;
+
+    protected _comparisonOutputs: SignalCollection;
+    
+    abstract operator: {(left: number, right: number): any};
+    
+    /*
+    *   Constructor
+    */
     constructor() {
         this.inputs = [];
         this.output = {};
@@ -35,21 +73,11 @@ abstract class Combinator {
             },
         }
     }
-
-    public inputs: Conduit[];
-
-    public operands: { 
-        left: Operand;
-        right: Operand;
-        output: Operand;
-    };
-
-    public outputOne: boolean;
-
-    public output: SignalCollection;
-
-    protected _comparisonOutputs: SignalCollection;
-
+    
+ 
+    /*
+    *   Getters/Setters
+    */
     protected get _mergedInputs(): SignalCollection {
         let inputCollections: SignalCollection[] = [];
 
@@ -122,43 +150,31 @@ abstract class Combinator {
         }
     }
 
-    abstract operator: {(left: number, right: number): any};
+    /*
+    *   Methods
+    */
 
     abstract tick(): void;
     abstract tock(): void;
 }
 
-const DeciderOperators: { [funcName: string]: ComparisonFunction } = {
-    lt: (L: number, R: number): boolean => {
-        return (L < R);
-    },
-    gt: (L: number, R: number): boolean => {
-        return (L > R);
-    },
-    lte: (L: number, R: number): boolean => {
-        return (L <= R);
-    },
-    gte: (L: number, R: number): boolean => {
-        return (L >= R);
-    },
-    eq: (L: number, R: number): boolean => {
-        return (L === R);
-    },
-    neq: (L: number, R: number): boolean => {
-        return (L !== R);
-    }
-} 
-
 export class DeciderCombinator extends Combinator {
+    /*
+    *   Members
+    */
+    public static Operators = DeciderOperators;
+    public operator: ComparisonFunction;
 
+    /*
+    *   Constructor
+    */
     constructor() {
         super();
     }
 
-    public static Operators = DeciderOperators;
-
-    public operator: ComparisonFunction;
-
+    /*
+    *   Methods
+    */
     public tick(): void {
         this._calculate();
     }
@@ -277,9 +293,8 @@ export class DeciderCombinator extends Combinator {
         else {
             throw("DeciderCombinator: Invalid left-hand type");
         }
-
-        }
     }
+}
     
 
 
