@@ -170,7 +170,6 @@ describe('Decider Combinator', () => {
 
         expect(dc.output).to.deep.equal({B: 2});
 
-
         dc.operands.left = sigB;
         dc.operator = DeciderCombinator.Operators.gt;
         dc.operands.right = noName;
@@ -260,7 +259,6 @@ describe('Decider Combinator', () => {
         dc.operands.right = sigB;
         dc.operands.output = every;
 
-
         dc.tick();
         dc.tock();
 
@@ -285,7 +283,7 @@ describe('Decider Combinator', () => {
     });
 
     it('should handle a left hand operand of "each"', () => {
-        dc.operands.left = { type: OperandType.Each, };
+        dc.operands.left = { type: OperandType.Each };
         dc.operator = DeciderCombinator.Operators.gt;
         dc.operands.right = { type: OperandType.Signal, name: 'B' };
         dc.operands.output = { type: OperandType.Each };
@@ -429,7 +427,7 @@ describe('Decider Combinator', () => {
         expect(dc.output).to.deep.equal({A: 5, B: 2, C: 3, D: 8});
 
         // changing an input value should produce a proper result after one tick/tock
-        ci2.output.A = 14
+        ci2.output.A = 14;
         dc.tick();
         dc.tock();
         expect(dc.output).to.deep.equal({A: 15, B: 2, C: 3, D: 8});
