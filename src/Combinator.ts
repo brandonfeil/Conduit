@@ -4,6 +4,7 @@ import { MathFunction }         from './interfaces/MathFunction';
 import { OperandType }          from './interfaces/OperandType';
 import { Operand }              from './interfaces/Operand';
 import { SignalCollection }     from './interfaces/SignalCollection';
+import { Signal }               from './interfaces/Signal';
 
 // Classes
 import { Conduit }              from './Conduit';
@@ -32,6 +33,33 @@ const DeciderOperators: { [funcName: string]: ComparisonFunction } = {
 const MathOperators: { [funcName: string]: MathFunction } = {
     add: (L: number, R: number): number => {
         return Math.trunc(L + R);
+    },
+    subtract: (L: number, R: number): number => {
+        return Math.trunc(L - R);
+    },
+    multiply: (L: number, R: number): number => {
+        return Math.trunc(L * R);
+    },
+    divide: (L: number, R: number): number => {
+        return Math.trunc(L / R);
+    },
+    mod: (L: number, R: number): number => {
+        return Math.trunc(L % R);
+    },
+    rightShift: (L: number, R: number): number => {
+        return L >> R;
+    },
+    leftShift: (L: number, R: number): number => {
+        return L << R;
+    },
+    and: (L: number, R: number): number => {
+        return L & R;
+    },
+    or: (L: number, R: number): number => {
+        return L | R;
+    },
+    xor: (L: number, R: number): number => {
+        return L ^ R;
     },
 };
 
@@ -89,7 +117,7 @@ abstract class Combinator {
         let inputCollections: SignalCollection[] = [];
 
         for (let conduit of this.inputs) {
-            inputCollections.push(conduit.value); 
+            inputCollections.push(conduit.value);
         }
 
         // get merged properties
@@ -112,6 +140,19 @@ abstract class Combinator {
             if (result[key] === 0) {
                 delete result[key];
             }
+        }
+
+        return result;
+    }
+
+    protected get _inputSignals(): Signal[] {
+        let result: Signal[] = [];
+
+        for (let signal of Object.keys(this._mergedInputs)) {
+            result.push({
+                name: signal,
+                value: this._mergedInputs[signal],
+            });
         }
 
         return result;
@@ -150,7 +191,7 @@ abstract class Combinator {
                 }
             }
             else {
-                if (this._operationResults.hasOwnProperty(this.operands.output.name)) { 
+                if (this._operationResults.hasOwnProperty(this.operands.output.name)) {
                     result[this.operands.output.name] = this._operationResults[this.operands.output.name];
                 }
             }
@@ -202,67 +243,100 @@ export class DeciderCombinator extends Combinator {
                 return;
         }
 
-        // establish rightHand value
-        let rightHandValue = 0;
-
-        if (this.operands.right.type === OperandType.Constant) {
-            rightHandValue = this.operands.right.value ? this.operands.right.value : 0;
-        }
-        else if (this.operands.right.type === OperandType.Signal) {
-            rightHandValue = this._mergedInputs.hasOwnProperty(this.operands.right.name) ? this._mergedInputs[this.operands.right.name] : 0;
-        }
-        else {
-            throw('DeciderCombinator: Virtual signals cannot be right-hand operators');
-        }
-
-        // calculate based on left hand type
-
         let matches: SignalCollection = {};
 
-        // Signal (Only one comparison)
-        if (this.operands.left.type === OperandType.Signal) {
-            let leftHandValue = this._mergedInputs.hasOwnProperty(this.operands.left.name) ? this._mergedInputs[this.operands.left.name] : 0;
+        // establish leftHand value
 
-            if (this.operator(leftHandValue, rightHandValue)) {
-                matches = this._mergedInputs;
+
+        let rhv: Signal;
+
+        let resolveNamedSignal = (name: string): Signal => {
+            let signal: Signal = this._inputSignals.find( (signal: Signal) => {
+                return signal.name === name;
+            });
+
+            if (signal === undefined) {
+                signal = {
+                    name: 'notFound',
+                    value: 0,
+                };
+            }
+
+            return signal;
+        };
+
+        // establish right-hand operand value
+        switch (this.operands.right.type) {
+            case OperandType.Constant: {
+                rhv = {
+                    name: 'constant',
+                    value: this.operands.right.value ? this.operands.right.value : 0,
+                };
+
+                break;
+            }
+            case OperandType.Signal: {
+                rhv = resolveNamedSignal(this.operands.right.name);
+
+                break;
+            }
+            default: {
+                throw('DeciderCombinator: Invalid right-hand operand');
             }
         }
-        // Any (True if anything matches)
-        else if (this.operands.left.type === OperandType.Any) {
-            for (let signal of Object.keys(this._mergedInputs)) {
-                let leftHandValue = this._mergedInputs[signal];
 
-                if (this.operator(leftHandValue, rightHandValue)) {
+        // some functions to help our array processing
+        let makeOperationTrue = (lhv: Signal) => {
+            return this.operator(lhv.value, rhv.value);
+        };
+
+        let makeOperationFalse = (lhv: Signal) => {
+            return !this.operator(lhv.value, rhv.value);
+        };
+
+        // calculate based on left-hand
+        switch (this.operands.left.type) {
+            case OperandType.Any: {
+                if (this._inputSignals.some(makeOperationTrue)) {
                     matches = this._mergedInputs;
-                    break;
                 }
-            }
-        }
-        // Every (True if everything matches)
-        else if (this.operands.left.type === OperandType.Every) {
-            matches = this._mergedInputs;
-
-            for (let signal of Object.keys(this._mergedInputs)) {
-                let leftHandValue = this._mergedInputs[signal];
-
-                if (!this.operator(leftHandValue, rightHandValue)) {
+                else {
                     matches = {};
                 }
+                break;
             }
-        }
-        // Each (True if there are any matches)
-        else if (this.operands.left.type === OperandType.Each) {
-            for (let signal of Object.keys(this._mergedInputs)) {
-                let leftHandValue = this._mergedInputs[signal];
-
-                if (this.operator(leftHandValue, rightHandValue)) {
-                    matches[signal] = leftHandValue;
+            case OperandType.Every: {
+                if (this._inputSignals.some(makeOperationFalse)) {
+                    matches = {};
                 }
+                else {
+                    matches = this._mergedInputs;
+                }
+
+                break;
             }
-        }
-        // Any other types are invalid
-        else {
-            throw('DeciderCombinator: Invalid left-hand type');
+            case OperandType.Each: {
+                let res: Signal[];
+
+                res = this._inputSignals.filter(makeOperationTrue);
+
+                // Remove later when refactoring Signal Collection to Signal[]
+                res.forEach( (match: Signal) => {
+                    matches[match.name] = match.value;
+                });
+
+                break;
+            }
+            case OperandType.Signal: {
+                let lhv: Signal = resolveNamedSignal(this.operands.left.name);
+
+                matches = this.operator(lhv.value, rhv.value) ? this._mergedInputs : {};
+
+                break;
+            }
+            default: {
+                throw('DeciderCombinator: Invalid left-hand operand');
+            }
         }
 
         this._operationResults = matches;
@@ -271,5 +345,4 @@ export class DeciderCombinator extends Combinator {
     public tock(): void {
         this.output = this._filteredOutputs;
     }
-
 }

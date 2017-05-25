@@ -157,7 +157,7 @@ describe('Decider Combinator', () => {
         expect(dc.output).to.deep.equal({B: 2});
     });
 
-    it('should treat "Signal" input operands with no name as having a value of 0', () => {
+    it('should return treat "signal" input operands with no name as having a value of 0', () => {
 
         // "Signal" types should include names
         dc.operands.left = noName;
