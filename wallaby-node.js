@@ -11,8 +11,8 @@ module.exports = function (w) {
 
     env: {
       type: 'node'
+      //kind: 'electron'
     },
-
     testFramework: 'mocha'
   };
 };

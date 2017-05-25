@@ -23,7 +23,9 @@
     "@types/chai": "^3.5.2",
     "@types/mocha": "^2.2.41",
     "chai": "^3.5.0",
+    "electron": "^1.6.8",
     "ts-node": "^3.0.4",
+    "tsutils": "^2.1.0",
     "typescript": "^2.3.2"
   }
 }
