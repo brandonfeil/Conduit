@@ -406,6 +406,7 @@ describe('Decider Combinator', () => {
         dc.operands.right = const1;
         dc.operands.output = every;
 
+
         dc.tick();
         dc.tock();
 

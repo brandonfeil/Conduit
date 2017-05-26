@@ -1,5 +1,6 @@
 // Interfaces
 import { ConduitInput }     from './interfaces/ConduitInput';
+import { ConduitProvider }  from './interfaces/ConduitProvider';
 import { SignalCollection } from './interfaces/SignalCollection';
 
 export class Conduit {
@@ -7,6 +8,7 @@ export class Conduit {
     *   Members
     */
     public inputs: ConduitInput[];
+    public providers: ConduitProvider[];
 
     /*
     *   Constructor
