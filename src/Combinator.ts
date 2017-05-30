@@ -78,7 +78,7 @@ abstract class Combinator implements ConduitProvider {
     public output: SignalCollection;
     public values: Signal[];
 
-    public outputOne: boolean;
+    protected outputOne: boolean;
 
     public abstract operator: {(left: number, right: number): any};
 
@@ -181,6 +181,8 @@ export class DeciderCombinator extends Combinator {
     public static Operators = DeciderOperators;
     public operator: ComparisonFunction;
 
+    public outputOne: boolean;
+
     /*
     *   Constructor
     */
@@ -191,26 +193,25 @@ export class DeciderCombinator extends Combinator {
     /*
     *   Methods
     */
-
     protected _enforceIOTypeRules(): void {
         switch (this.operands.output.type) {
             case OperandType.Each: {
                 if (this.operands.left.type !== OperandType.Each) {
-                    throw('Combinator: Invalid output type "Each" without left-hand type "Each"');
+                    throw('DeciderCombinator: Invalid output type "Each" without left-hand type "Each"');
                 }
                 break;
             }
             case OperandType.Every: {
                 if (this.operands.left.type === OperandType.Each) {
-                    throw('Combinator: Invalid output type "Every" with left-hand type "Each"');
+                    throw('DeciderCombinator: Invalid output type "Every" with left-hand type "Each"');
                 }
                 break;
             }
             case OperandType.Any: {
-                throw('Combinator: Invalid output type "Any"');
+                throw('DeciderCombinator: Invalid output type "Any"');
             }
             case OperandType.Constant: {
-                throw('Combinator: Invalid output type "Constant"');
+                throw('DeciderCombinator: Invalid output type "Constant"');
             }
             default: {
                 break;
@@ -321,8 +322,7 @@ export class DeciderCombinator extends Combinator {
         }
 
         // filter based on output
-        console.log(this._snapshot.operands.output)
-        switch (this._snapshot.operands.output.type) { 
+        switch (this._snapshot.operands.output.type) {
             case OperandType.Each:
             case OperandType.Every: {
                 break;
@@ -352,7 +352,151 @@ export class DeciderCombinator extends Combinator {
             }
         }
 
-        // remove zeros
+        // remove zero
+        matches = matches.filter( (signal) => {
+            return signal.value !== 0;
+        });
+
+        this.values = matches;
+    }
+}
+
+export class ArithmeticCombinator extends Combinator {
+    /*
+    *   Members
+    */
+    public static Operators = MathOperators;
+    public operator: MathFunction;
+
+    /*
+    *   Constructor
+    */
+    constructor() {
+        super();
+    }
+
+    /*
+    *   Methods
+    */
+    protected _enforceIOTypeRules(): void {
+        switch (this.operands.output.type) {
+            case OperandType.Each: {
+                if (this.operands.left.type !== OperandType.Each) {
+                    throw('Combinator: Invalid output type "Each" without left-hand type "Each"');
+                }
+                break;
+            }
+            case OperandType.Every: {
+                throw('ArithmeticCombinator: Invalid output type "Every"');
+            }
+            case OperandType.Any: {
+                throw('ArithmeticCombinator: Invalid output type "Any"');
+            }
+            case OperandType.Constant: {
+                throw('ArithmeticCombinator: Invalid output type "Constant"');
+            }
+            default: {
+                break;
+            }
+        }
+    }
+
+    public tock(): void {
+        // return an empty object if any operands are missing
+        if ( Object.keys(this._snapshot.operands.left).length === 0 ||
+            Object.keys(this._snapshot.operands.right).length === 0 ||
+            Object.keys(this._snapshot.operands.output).length === 0 ) {
+                this.values = [];
+                return;
+        }
+
+        let matches: Signal[] = [];
+
+        let rhv: Signal;
+
+        let resolveNamedSignal = (name: string): Signal => {
+            let signal: Signal = this._snapshot.values.find( (signal: Signal) => {
+                return signal.name === name;
+            });
+
+            if (signal === undefined) {
+                signal = {
+                    name: 'notFound',
+                    value: 0,
+                };
+            }
+
+            return signal;
+        };
+
+        // establish right-hand operand value
+        switch (this._snapshot.operands.right.type) {
+            case OperandType.Constant: {
+                rhv = {
+                    name: 'constant',
+                    value: this._snapshot.operands.right.value ? this._snapshot.operands.right.value : 0,
+                };
+
+                break;
+            }
+            case OperandType.Signal: {
+                rhv = resolveNamedSignal(this._snapshot.operands.right.name);
+
+                break;
+            }
+            default: {
+                throw('ArithmeticCombinator: Invalid right-hand operand');
+            }
+        }
+
+        // calculate based on left-hand
+        switch (this._snapshot.operands.left.type) {
+            case OperandType.Each: {
+                matches = this._snapshot.values.map( (lhv: Signal) => {
+                    let result: Signal = lhv;
+
+                    result.value = this.operator(lhv.value, rhv.value);
+                    return result;
+                });
+
+                break;
+            }
+            case OperandType.Signal: {
+                let lhv: Signal = resolveNamedSignal(this.operands.left.name);
+                let result: Signal = lhv;
+
+                result.value = this.operator(lhv.value, rhv.value);
+
+                matches = [result];
+
+                break;
+            }
+            default: {
+                throw('ArithmeticCombinator: Invalid left-hand operand');
+            }
+        }
+
+        // filter based on output
+        switch (this._snapshot.operands.output.type) {
+            case OperandType.Each: {
+                break;
+            }
+            case OperandType.Signal: {
+                let result: Signal = { name: this._snapshot.operands.output.name, value: 0 };
+
+                result.value = matches.reduce( (acc, signal): number => {
+                    return acc + signal.value;
+                }, 0);
+
+                matches = [result];
+                break;
+            }
+            default: {
+                throw('ArithmeticCombinator: Invalid output operand');
+            }
+        }
+
+        // remove zero
         matches = matches.filter( (signal) => {
             return signal.value !== 0;
         });

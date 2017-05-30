@@ -9,10 +9,10 @@ import { ConduitProvider }      from '../src/interfaces/ConduitProvider';
 
 // Classes and Modules
 import { expect }               from 'chai';
-import { DeciderCombinator }    from '../src/Combinator';
+import { DeciderCombinator, ArithmeticCombinator }    from '../src/Combinator';
 import { Conduit }              from '../src/Conduit';
 
-describe('Decider Combinator', () => {
+describe ('Decider Combinator', () => {
     let dc: DeciderCombinator;
     let cd1: Conduit;
     let cd2: Conduit;
@@ -452,7 +452,6 @@ describe('Decider Combinator', () => {
         dc.operands.right = const1;
         dc.operands.output = every;
 
-
         dc.tick();
         dc.tock();
 
@@ -559,6 +558,500 @@ describe('Decider Combinator', () => {
         ]);
         expect(dcReciever.values).to.deep.equal([
             {name: 'D', value: 8 },
+        ]);
+    });
+});
+
+describe ('Arithmetic Combinator', () => {
+    let ac: ArithmeticCombinator;
+    let cd1: Conduit;
+    let cd2: Conduit;
+    let cp1: ConduitProvider = { values: [] };
+    let cp2: ConduitProvider = { values: [] };
+
+    const sigA: Operand = { type: OperandType.Signal, name: 'A' };
+    const sigB: Operand = { type: OperandType.Signal, name: 'B' };
+    const sigC: Operand = { type: OperandType.Signal, name: 'C' };
+    const sigD: Operand = { type: OperandType.Signal, name: 'D' };
+    const sigE: Operand = { type: OperandType.Signal, name: 'E' };
+    const sigF: Operand = { type: OperandType.Signal, name: 'F' };
+
+    const const1: Operand = { type: OperandType.Constant, value: 1 };
+    const const100: Operand = { type: OperandType.Constant, value: 100 };
+
+    const any: Operand = { type: OperandType.Any };
+    const each: Operand = { type: OperandType.Each };
+    const every: Operand = { type: OperandType.Every };
+
+    const empty: Operand = (<Operand>{});
+    const noName: Operand = { type: OperandType.Signal };
+    const noVal: Operand = { type: OperandType.Constant };
+
+    beforeEach( () => {
+        ac = new ArithmeticCombinator();
+
+        cd1 = new Conduit();
+        cd2 = new Conduit();
+
+        cp1.values = [
+            { name: 'A', value: 1 },
+            { name: 'B', value: 2 },
+            { name: 'C', value: 3 },
+            { name: 'E', value: 11 },
+        ];
+
+        cp2.values = [
+            { name: 'A', value: 4 },
+            { name: 'D', value: 8 },
+            { name: 'E', value: -11 },
+            { name: 'F', value: -7 },
+        ];
+
+        cd1.providers.push(cp1);
+
+        cd2.providers.push(cp2);
+
+        ac.inputs.push(cd1, cd2);
+    });
+
+    it ('should return empty outputs when run in a default state', () => {
+        let ac = new DeciderCombinator();
+
+        expect(() => ac.tick()).not.to.throw();
+        expect(() => ac.tock()).not.to.throw();
+        expect(ac.values).to.be.empty;
+    });
+
+    it ('should return empty outputs when run with an empty operand', () => {
+        // Left hand missing
+        ac.operands.left = empty;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = sigB;
+        ac.operands.output = sigB;
+
+        expect(() => ac.tick()).not.to.throw();
+        expect(() => ac.tock()).not.to.throw();
+        expect(ac.values).to.deep.equal([]);
+
+        // Right hand missing
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = empty;
+        ac.operands.output = sigB;
+
+        expect(() => ac.tick()).not.to.throw();
+        expect(() => ac.tock()).not.to.throw();
+        expect(ac.values).to.deep.equal([]);
+
+        // Output missing
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = sigB;
+        ac.operands.output = empty;
+
+        expect(() => ac.tick()).not.to.throw();
+        expect(() => ac.tock()).not.to.throw();
+        expect(ac.values).to.deep.equal([]);
+    });
+
+    it ('should perform simple math operations', () => {
+        // A opr B output B
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = sigB;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 7 }]);
+
+        ac.operands.left = sigB;
+        ac.operator = ArithmeticCombinator.Operators.subtract;
+        ac.operands.right = sigC;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: -1 }]);
+
+        ac.operands.left = sigB;
+        ac.operator = ArithmeticCombinator.Operators.multiply;
+        ac.operands.right = sigC;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 6 }]);
+
+        ac.operands.left = sigD;
+        ac.operator = ArithmeticCombinator.Operators.divide;
+        ac.operands.right = sigB;
+        ac.operands.output = sigD;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'D', value: 4 }]);
+
+        ac.operands.right = sigA;
+
+        ac.tick();
+        ac.tock();
+
+        // 8/5 = 1.6, should concatenate to 1
+        expect(ac.values).to.deep.equal([{ name: 'D', value: 1 }]);
+
+        ac.operands.left = sigF;
+
+        ac.tick();
+        ac.tock();
+
+        // -7/5 = -1.4, should concatenate to -1
+        expect(ac.values).to.deep.equal([{ name: 'D', value: -1 }]);
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.mod;
+        ac.operands.right = sigC;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 2 }]);
+
+        ac.operands.left = sigB;
+        ac.operator = ArithmeticCombinator.Operators.leftShift;
+        ac.operands.right = sigB;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 8 }]);
+
+        ac.operands.left = sigB;
+        ac.operator = ArithmeticCombinator.Operators.rightShift;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 1 }]);
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.and;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 1 }]);
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.or;
+        ac.operands.right = sigB;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 7 }]);
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.xor;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 4 }]);
+    });
+
+    it ('should handle an input type of each', () => {
+        ac.operands.left = each;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = each;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 6 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+
+        ac.operands.output = sigA;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 16 },
+        ]);
+    });
+
+    it ('should throw errors with invalid left-hand types', () => {
+        ac.operands.left = every;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+
+        ac.operands.left = any;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+
+        ac.operands.left = const1;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+    });
+
+    it ('should throw errors with invalid right-hand types', () => {
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = each;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = every;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = any;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        expect(() => ac.tock()).to.throw();
+    });
+
+    it ('should throw errors with invalid output types', () => {
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = const1;
+
+        expect(() => ac.tick()).to.throw();
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = every;
+
+        expect(() => ac.tick()).to.throw();
+
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = any;
+
+        expect(() => ac.tick()).to.throw();
+
+        // "each" not supported output without left hand each
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = each;
+
+        expect(() => ac.tick()).to.throw();
+    });
+
+    it ('should return treat "signal" input operands with no name as having a value of 0', () => {
+
+        // "Signal" types should include names
+        ac.operands.left = noName;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = sigB;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 2 }]);
+
+        ac.operands.left = sigB;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = noName;
+        ac.operands.output = sigB;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'B', value: 2}]);
+    });
+
+    it ('should treat "constant" input operands with no value as having a value of 0', () => {
+
+        // "Signal" types should include names
+        ac.operands.left = sigA;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = noVal;
+        ac.operands.output = sigA;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([{ name: 'A', value: 5 }]);
+    });
+
+    it ('signal results with value 0 should be removed', () => {
+        cp2.values = [];
+
+        ac.operands.left = each;
+        ac.operator = ArithmeticCombinator.Operators.subtract;
+        ac.operands.right = const1;
+        ac.operands.output = each;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'B', value: 1 },
+            { name: 'C', value: 2 },
+            { name: 'E', value: 10 },
+        ]);
+    });
+
+    it ('should behave predictably at every tick', () => {
+        ac.operands.left = each;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = each;
+
+        // tick -1 - Initial state of outputs
+        expect(ac.values).to.deep.equal([]);
+
+        ac.tick();  // tick 0 - First calculation tick, output should still be 0
+        ac.tock();  // tock 0 - Transfer tick calculation to outputs
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 6 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+
+        // changing an input value should produce a proper result after one tick/tock
+        cp2.values[0].value = 14;
+
+        ac.tick();
+        ac.tock();
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 16 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+
+        // changing an operand should produce a proper result after one tick/tock
+        ac.operands.output = sigA;
+        ac.tick();
+        ac.tock();
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 26 },
+        ]);
+
+        // changing an operator should produce a proper result after one tick/toc
+        ac.operator = ArithmeticCombinator.Operators.multiply;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 21 },
+        ]);
+    });
+
+    it ('should play nice with others', () => {
+        let dcReciever = new DeciderCombinator();
+
+        let cdReciever = new Conduit();
+
+        dcReciever.inputs.push(cdReciever);
+
+        // link the output of ac to dcReciever
+        cdReciever.providers.push(ac);
+
+        ac.operands.left = each;
+        ac.operator = ArithmeticCombinator.Operators.add;
+        ac.operands.right = const1;
+        ac.operands.output = each;
+
+        dcReciever.operands.left = sigA;
+        dcReciever.operator = DeciderCombinator.Operators.lt;
+        dcReciever.operands.right = sigD;
+        dcReciever.operands.output = sigD;
+
+        ac.tick();
+        dcReciever.tick();
+
+        expect(ac.values).to.deep.equal([]);
+        expect(dcReciever.values).to.deep.equal([]);
+
+        ac.tock();
+        dcReciever.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 6 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+
+        ac.tick();
+        dcReciever.tick();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 6 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+        expect(dcReciever.values).to.deep.equal([]);
+
+        ac.tock();
+        dcReciever.tock();
+
+        expect(ac.values).to.deep.equal([
+            { name: 'A', value: 6 },
+            { name: 'B', value: 3 },
+            { name: 'C', value: 4 },
+            { name: 'D', value: 9 },
+            { name: 'F', value: -6 },
+        ]);
+        expect(dcReciever.values).to.deep.equal([
+            {name: 'D', value: 9 },
         ]);
     });
 });
