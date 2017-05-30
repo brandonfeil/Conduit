@@ -69,20 +69,17 @@ abstract class Combinator implements ConduitProvider {
     /*
     *   Members
     */
-    public inputs: Conduit[];
+    public providers: ConduitProvider[];
     public operands: {
         left: Operand;
         right: Operand;
         output: Operand;
     };
-    public output: SignalCollection;
     public values: Signal[];
 
     protected outputOne: boolean;
 
     public abstract operator: {(left: number, right: number): any};
-
-    protected _operationResultsOld: SignalCollection;
 
     protected _snapshot: {
         values: Signal[];
@@ -98,13 +95,10 @@ abstract class Combinator implements ConduitProvider {
     *   Constructor
     */
     constructor() {
-        this.inputs = [];
-        this.output = {};
+        this.providers = [];
         this.values = [];
 
         this.outputOne = false;
-
-        this._operationResultsOld = {};
 
         this.operator = (l: number, r: number) => { return false; };
 
@@ -138,6 +132,13 @@ abstract class Combinator implements ConduitProvider {
     /*
     *   Getters/Setters
     */
+    public get inputs(): Signal[] {
+        let combinerConduit = new Conduit();
+
+        combinerConduit.providers = this.providers;
+
+        return combinerConduit.values;
+    }
 
     /*
     *   Methods
@@ -147,7 +148,7 @@ abstract class Combinator implements ConduitProvider {
     public tick(): void {
         // empty snapshot
         this._snapshot = {
-            values: [],
+            values: (<Signal[]>[]),
             operands: {
                 left: { type: OperandType.Signal, name: '' },
                 right: { type: OperandType.Signal, name: '' },
@@ -160,12 +161,8 @@ abstract class Combinator implements ConduitProvider {
         this._enforceIOTypeRules(); // Todo: probably this is not a good design pattern, a function that either throws or does not...
 
         // Take a snapshot of the current state to be used when we calculate
-        let combinerConduit = new Conduit();
-
-        combinerConduit.providers = this.inputs;
-
         this._snapshot = {
-            values: _.cloneDeep(combinerConduit.values),
+            values: _.cloneDeep(this.inputs),
             operands: _.cloneDeep(this.operands),
             outputOne: this.outputOne,
         };

@@ -59,7 +59,7 @@ describe ('Decider Combinator', () => {
 
         cd2.providers.push(cp2);
 
-        dc.inputs.push(cd1, cd2);
+        dc.providers.push(cd1, cd2);
     });
 
     it ('should return empty outputs when run in a default state', () => {
@@ -511,7 +511,7 @@ describe ('Decider Combinator', () => {
 
         let cdReciever = new Conduit();
 
-        dcReciever.inputs.push(cdReciever);
+        dcReciever.providers.push(cdReciever);
 
         // link the output of dc to dcReciever
         cdReciever.providers.push(dc);
@@ -611,7 +611,7 @@ describe ('Arithmetic Combinator', () => {
 
         cd2.providers.push(cp2);
 
-        ac.inputs.push(cd1, cd2);
+        ac.providers.push(cd1, cd2);
     });
 
     it ('should return empty outputs when run in a default state', () => {
@@ -996,7 +996,7 @@ describe ('Arithmetic Combinator', () => {
 
         let cdReciever = new Conduit();
 
-        dcReciever.inputs.push(cdReciever);
+        dcReciever.providers.push(cdReciever);
 
         // link the output of ac to dcReciever
         cdReciever.providers.push(ac);
