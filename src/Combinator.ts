@@ -100,6 +100,7 @@ abstract class Combinator implements ConduitProvider {
     constructor() {
         this.inputs = [];
         this.output = {};
+        this.values = [];
 
         this.outputOne = false;
 
@@ -138,102 +139,6 @@ abstract class Combinator implements ConduitProvider {
     *   Getters/Setters
     */
 
-    protected get _mergedInputs(): SignalCollection {
-        let inputCollections: SignalCollection[] = [];
-
-        for (let conduit of this.inputs) {
-            inputCollections.push(conduit.value);
-        }
-
-        // get merged properties
-        let result: SignalCollection = Object.assign({}, ...inputCollections);
-
-        // then zero out the merged list so we can ADD the original inputs together
-        for (let key of Object.keys(result)) {
-            result[key] = 0;
-        }
-
-        // loop through each input Signals and add its values to the rest
-        for (let input of inputCollections) {
-            for (let key of Object.keys(input)) {
-                result[key] += input[key];
-            }
-        }
-
-        // in Factorio, a signal ceases to exist if its value is 0
-        for (let key of Object.keys(result)) {
-            if (result[key] === 0) {
-                delete result[key];
-            }
-        }
-
-        return result;
-    }
-
-    protected get _inputSignals(): Signal[] {
-        let result: Signal[] = [];
-
-        for (let signal of Object.keys(this._mergedInputs)) {
-            result.push({
-                name: signal,
-                value: this._mergedInputs[signal],
-            });
-        }
-
-        return result;
-    }
-
-    protected get _filteredOutputs(): SignalCollection {
-        // if there is no output operand, return an empty object
-        if (Object.keys(this.operands.output).length === 0) {
-            return {};
-        }
-
-        let result: SignalCollection = {};
-
-        if (this.operands.output.type === OperandType.Every) {
-            if (this.operands.left.type === OperandType.Each) {
-                throw('Combinator: Every cannot be an output type left-hand operand Each');
-            }
-
-            result = this._operationResultsOld;
-        }
-        else if (this.operands.output.type === OperandType.Each) {
-            if (this.operands.left.type !== OperandType.Each) {
-                throw('Combinator: Each cannot be an output type unless it is a left-hand operand');
-            }
-
-            result = this._operationResultsOld;
-        }
-        else if (this.operands.output.type === OperandType.Signal) {
-            // Comparisons with an output type of Signal and an input of Each are a sum of all resulting matches
-            //  for inputs of { A: 3, B: 2, C: 4 } | each > 2 output B = { B: 7 }
-            if (this.operands.left.type === OperandType.Each) {
-                result[this.operands.output.name] = 0;
-
-                for (let key of Object.keys(this._operationResultsOld)) {
-                    result[this.operands.output.name] += this._operationResultsOld[key];
-                }
-            }
-            else {
-                if (this._operationResultsOld.hasOwnProperty(this.operands.output.name)) {
-                    result[this.operands.output.name] = this._operationResultsOld[this.operands.output.name];
-                }
-            }
-        }
-        else {
-            throw('Combinator: invalid output operand');
-        }
-
-        if (this.outputOne) {
-            for (let key of Object.keys(result)) {
-                result[key] = 1;
-            }
-        }
-
-        return result;
-    }
-
     /*
     *   Methods
     */
@@ -266,7 +171,7 @@ abstract class Combinator implements ConduitProvider {
         };
     }
 
-    abstract tockNew(): void;
+    abstract tock(): void;
 }
 
 export class DeciderCombinator extends Combinator {
@@ -313,118 +218,12 @@ export class DeciderCombinator extends Combinator {
         }
     }
 
-    public tick(): void { // return an empty object if any operands are missing
-        if ( Object.keys(this.operands.left).length === 0 ||
-            Object.keys(this.operands.right).length === 0 ||
-            Object.keys(this.operands.output).length === 0 ) {
-                this._operationResultsOld = {};
-                return;
-        }
-
-        let matches: SignalCollection = {};
-
-        // establish leftHand value
-
-
-        let rhv: Signal;
-
-        let resolveNamedSignal = (name: string): Signal => {
-            let signal: Signal = this._inputSignals.find( (signal: Signal) => {
-                return signal.name === name;
-            });
-
-            if (signal === undefined) {
-                signal = {
-                    name: 'notFound',
-                    value: 0,
-                };
-            }
-
-            return signal;
-        };
-
-        // establish right-hand operand value
-        switch (this.operands.right.type) {
-            case OperandType.Constant: {
-                rhv = {
-                    name: 'constant',
-                    value: this.operands.right.value ? this.operands.right.value : 0,
-                };
-
-                break;
-            }
-            case OperandType.Signal: {
-                rhv = resolveNamedSignal(this.operands.right.name);
-
-                break;
-            }
-            default: {
-                throw('DeciderCombinator: Invalid right-hand operand');
-            }
-        }
-
-        // some functions to help our array processing
-        let makeOperationTrue = (lhv: Signal) => {
-            return this.operator(lhv.value, rhv.value);
-        };
-
-        let makeOperationFalse = (lhv: Signal) => {
-            return !this.operator(lhv.value, rhv.value);
-        };
-
-        // calculate based on left-hand
-        switch (this.operands.left.type) {
-            case OperandType.Any: {
-                if (this._inputSignals.some(makeOperationTrue)) {
-                    matches = this._mergedInputs;
-                }
-                else {
-                    matches = {};
-                }
-                break;
-            }
-            case OperandType.Every: {
-                if (this._inputSignals.some(makeOperationFalse)) {
-                    matches = {};
-                }
-                else {
-                    matches = this._mergedInputs;
-                }
-
-                break;
-            }
-            case OperandType.Each: {
-                let res: Signal[];
-
-                res = this._inputSignals.filter(makeOperationTrue);
-
-                // Remove later when refactoring Signal Collection to Signal[]
-                res.forEach( (match: Signal) => {
-                    matches[match.name] = match.value;
-                });
-
-                break;
-            }
-            case OperandType.Signal: {
-                let lhv: Signal = resolveNamedSignal(this.operands.left.name);
-
-                matches = this.operator(lhv.value, rhv.value) ? this._mergedInputs : {};
-
-                break;
-            }
-            default: {
-                throw('DeciderCombinator: Invalid left-hand operand');
-            }
-        }
-
-        this._operationResultsOld = matches;
-    }
-    public tockNew(): void {
+    public tock(): void {
         // return an empty object if any operands are missing
         if ( Object.keys(this._snapshot.operands.left).length === 0 ||
             Object.keys(this._snapshot.operands.right).length === 0 ||
             Object.keys(this._snapshot.operands.output).length === 0 ) {
-                this._operationResultsOld = {};
+                this.values = [];
                 return;
         }
 
@@ -498,7 +297,7 @@ export class DeciderCombinator extends Combinator {
                 break;
             }
             case OperandType.Each: {
-                matches = this._inputSignals.filter(makeOperationTrue);
+                matches = this._snapshot.values.filter(makeOperationTrue);
 
                 break;
             }
@@ -515,12 +314,15 @@ export class DeciderCombinator extends Combinator {
         }
 
         // apply outputOne
-        matches = matches.map( (signal): Signal => {
-            return { name: signal.name, value: 1 };
-        });
+        if (this._snapshot.outputOne) {
+            matches = matches.map( (signal): Signal => {
+                return { name: signal.name, value: 1 };
+            });
+        }
 
         // filter based on output
-        switch (this._snapshot.operands.output.type) {
+        console.log(this._snapshot.operands.output)
+        switch (this._snapshot.operands.output.type) { 
             case OperandType.Each:
             case OperandType.Every: {
                 break;
@@ -543,6 +345,7 @@ export class DeciderCombinator extends Combinator {
                 }
 
                 matches = [result];
+                break;
             }
             default: {
                 throw('DeciderCombinator: Invalid output operand');
@@ -555,9 +358,5 @@ export class DeciderCombinator extends Combinator {
         });
 
         this.values = matches;
-    }
-
-    public tock(): void {
-        this.output = this._filteredOutputs;
     }
 }
