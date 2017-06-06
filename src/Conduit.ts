@@ -4,7 +4,7 @@ import { ConduitProvider }  from './interfaces/ConduitProvider';
 import { Signal }           from './interfaces/Signal';
 import { SignalCollection } from './interfaces/SignalCollection';
 
-export class Conduit {
+export class Circuit {
     /*
     *   Members
     */

@@ -1,4 +1,6 @@
+import { SignalID } from './SignalID';
+
 export interface Signal {
-    name: string;
-    value: number;
+    signal: SignalID;
+    count: number;
 }

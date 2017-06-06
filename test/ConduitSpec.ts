@@ -6,16 +6,16 @@ import { ConduitProvider }    from '../src/interfaces/ConduitProvider';
 
 // Classes and Modules
 import { expect }               from 'chai';
-import { Conduit }              from '../src/Conduit';
+import { Circuit }              from '../src/Conduit';
 
 describe('Conduit', () => {
-    let cd: Conduit;
+    let cd: Circuit;
 
     let cp1: ConduitProvider = { values: [] };
     let cp2: ConduitProvider = { values: [] };
 
     beforeEach( () => {
-        cd = new Conduit();
+        cd = new Circuit();
 
         cp1.values = [
             { name: 'A', value: 1},
@@ -33,7 +33,7 @@ describe('Conduit', () => {
     });
 
     it('should return an empty object in its default state', () => {
-        cd = new Conduit();
+        cd = new Circuit();
 
         expect(cd.values).to.be.empty;
     });
