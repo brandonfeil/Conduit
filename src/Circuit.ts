@@ -17,25 +17,26 @@ export class Circuit {
         }
 
         // get all unique signals contained in merged
-        let deduped: Signal[] = merged.filter( (entry, i, arr) => {
-            return i === arr.findIndex( (s) => {
-                return s.signal.name === entry.signal.name;
+        let deduped: Signal[] = merged.filter( (mergedEntry, i, arr) => {
+            // only include entries if they are the first instance of it in the array
+            return i === arr.findIndex( (findEntry) => {
+                return findEntry.signal.name === mergedEntry.signal.name;
             });
         });
 
         // collect and sum values for each unique signal
-        let result: Signal[] = deduped.map( (unique): Signal => {
+        let result: Signal[] = deduped.map( (uniqueEntry): Signal => {
             let resultSignal: Signal = {
-                signal: unique.signal,
+                signal: uniqueEntry.signal,
                 count: 0,
             };
 
             // find all input Signals with the uniqueSignal's name and accumulate their values
-            resultSignal.count = merged.filter( (entry) => {
-                return entry.signal.name === unique.signal.name;
+            resultSignal.count = merged.filter( (filterEntry) => {
+                return filterEntry.signal.name === uniqueEntry.signal.name;
             })
-            .reduce( (acc, entry): number => {
-                return acc + entry.count;
+            .reduce( (curCount, reduceEntry): number => {
+                return curCount + reduceEntry.count;
             }, 0);
 
             return resultSignal;
