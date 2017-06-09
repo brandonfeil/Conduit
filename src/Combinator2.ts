@@ -36,16 +36,21 @@ export class DeciderCombinator extends Combinator {
 
     // Methods --------------------------------------------------
     public tick(): void {
-        let mergeCircuit = new Circuit();
+        let mergerCircuit = new Circuit();
 
-        mergeCircuit.providers = this.connections;
+        mergerCircuit.providers = this.connections;
 
-        this._snapshot.signals = _.cloneDeep(mergeCircuit.signals);
+        this._snapshot.signals = _.cloneDeep(mergerCircuit.signals);
         this._snapshot.control_behavior = _.cloneDeep(this.control_behavior);
     }
 
     public tock(): void {
-        
+        let lhv: Signal[] = this._snapshot.signals;
+
+        let isSpecial = (this._snapshot.control_behavior.first_signal.name === 'signal-each'
+            || this._snapshot.control_behavior.first_signal.name === 'signal-anything'
+            || this._snapshot.control_behavior.first_signal.name === 'signal-everything');
+
     }
 
     // Constructor --------------------------------------------------
