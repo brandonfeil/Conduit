@@ -13,6 +13,6 @@ module.exports = function (w) {
       type: 'node'
       //kind: 'electron'
     },
-    testFramework: 'mocha'
+    testFramework: 'mocha',
   };
 };

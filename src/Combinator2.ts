@@ -59,6 +59,7 @@ export class DeciderCombinator extends Combinator {
 
     public get valid (): boolean {
         // enforce all rules determining whether or not this is a valid set of inputs
+        console.log(this.control_behavior);
         if (this.control_behavior === undefined) {
             return false;
         }
@@ -74,9 +75,9 @@ export class DeciderCombinator extends Combinator {
 
         // right-hand value
         if ((this.control_behavior.second_signal === undefined && this.control_behavior.constant === undefined)
-            || this.control_behavior.second_signal.name === 'signal-each'
-            || this.control_behavior.second_signal.name === 'signal-everything'
-            || this.control_behavior.second_signal.name === 'signal-anything') {
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-each')
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-everything')
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-anything')) {
                 return false;
         }
 
@@ -98,7 +99,7 @@ export class DeciderCombinator extends Combinator {
     }
 
     // Private
-    private _snapshot: {
+    public _snapshot: {
         valid: boolean,
         input_signals?: Signal[];
         first_signal?: SignalID;
@@ -138,8 +139,10 @@ export class DeciderCombinator extends Combinator {
             this.signals = [];
             return;
         }
+        console.log('tock', this._snapshot)
 
         let results: Signal[] = [];
+        let success = false;
 
         let rhv: number;
 
@@ -158,22 +161,23 @@ export class DeciderCombinator extends Combinator {
                 for (let signal of this._snapshot.input_signals) {
                     if (DeciderCombinator.Comparators[this._snapshot.comparator](signal.count, rhv)) {
                         results = this._snapshot.input_signals;
+                        success = true;
                         break;
                     }
                 }
                 break;
             }
             case('signal-everything'): {
-                let failed = false;
+                success = true;
 
                 for (let signal of this._snapshot.input_signals) {
                     if (!DeciderCombinator.Comparators[this._snapshot.comparator](signal.count, rhv)) {
-                        failed = true;
+                        success = false;
                         break;
                     }
                 }
 
-                if (!failed) {
+                if (success) {
                     results = this._snapshot.input_signals;
                 }
                 break;
@@ -182,6 +186,7 @@ export class DeciderCombinator extends Combinator {
                 for (let signal of this._snapshot.input_signals) {
                     if (DeciderCombinator.Comparators[this._snapshot.comparator](signal.count, rhv)) {
                         results.push(signal);
+                        success = true;
                     }
                 }
                 break;
@@ -192,11 +197,13 @@ export class DeciderCombinator extends Combinator {
                 lhv_signal = _.find(this._snapshot.input_signals, ['signal.name', this._snapshot.first_signal.name]);
 
                 if (lhv_signal === undefined) {
+                    success = false;
                     break;
                 }
 
                 if (DeciderCombinator.Comparators[this._snapshot.comparator](lhv_signal.count, rhv)) {
                     results = this._snapshot.input_signals;
+                    success = true;
                 }
             }
         }
@@ -226,13 +233,11 @@ export class DeciderCombinator extends Combinator {
                         count: value,
                     }];
                 }
-                else if (this._snapshot.copy_count_from_input === false) {
-                    if (results.length > 0) {
-                        results = [{
-                            signal: this._snapshot.output_signal,
-                            count: 1,
-                        }];
-                    }
+                else if (this._snapshot.copy_count_from_input === false && success) {
+                    results = [{
+                        signal: this._snapshot.output_signal,
+                        count: 1,
+                    }];
                 }
                 else {
                    let result_signal: Signal;
