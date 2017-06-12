@@ -59,7 +59,6 @@ export class DeciderCombinator extends Combinator {
 
     public get valid (): boolean {
         // enforce all rules determining whether or not this is a valid set of inputs
-        console.log(this.control_behavior);
         if (this.control_behavior === undefined) {
             return false;
         }
@@ -139,7 +138,6 @@ export class DeciderCombinator extends Combinator {
             this.signals = [];
             return;
         }
-        console.log('tock', this._snapshot)
 
         let results: Signal[] = [];
         let success = false;
@@ -194,11 +192,11 @@ export class DeciderCombinator extends Combinator {
             default: {
                 let lhv_signal: Signal;
 
-                lhv_signal = _.find(this._snapshot.input_signals, ['signal.name', this._snapshot.first_signal.name]);
+                lhv_signal = _.find(this._snapshot.input_signals, ['signal.name', this._snapshot.first_signal.name]); /*?*/
 
+                // treat missing signals as having a value of 0
                 if (lhv_signal === undefined) {
-                    success = false;
-                    break;
+                    lhv_signal = { signal: this._snapshot.first_signal, count: 0 };
                 }
 
                 if (DeciderCombinator.Comparators[this._snapshot.comparator](lhv_signal.count, rhv)) {
@@ -255,7 +253,6 @@ export class DeciderCombinator extends Combinator {
     // Constructor --------------------------------------------------
     constructor () {
         super();
-
         this._snapshot = { valid: false };
     }
 }

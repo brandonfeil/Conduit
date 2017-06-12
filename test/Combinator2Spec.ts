@@ -52,7 +52,7 @@ describe ('DeciderCombinator', () => {
         dc.control_behavior.copy_count_from_input = true;
     });
 
-    it('Should return an empty result if any of its settings is empty', () => {
+    it('Should return an empty result if any of its settings are empty or is otherwise not initialized', () => {
         // left hand missing
         dc.control_behavior.first_signal = undefined;
 
@@ -110,9 +110,18 @@ describe ('DeciderCombinator', () => {
 
         expect(dc.valid).to.be.false;
         expect(dc.signals).to.have.lengthOf(0);
+
+        // brand new state
+        dc = new DeciderCombinator();
+
+        dc.tick();
+        dc.tock();
+
+        expect(dc.valid).to.be.false;
+        expect(dc.signals).to.have.lengthOf(0);
     });
 
-    it('Should return an empty result if any of its setings are invalid', () => {
+    it('Should return an empty result if any of its settings are invalid', () => {
         // "signal-everything" cannot be a second_signal
         dc.control_behavior.second_signal = { type: SignalType.virtual, name: 'signal-everything' };
 
@@ -243,6 +252,7 @@ describe ('DeciderCombinator', () => {
     });
 
     it('Should treat signals that don\'t exist as if they have a value of 0', () => {
+        // second signal
         dc.control_behavior.first_signal = sigA;
         dc.control_behavior.comparator = '<';
         dc.control_behavior.second_signal = {
@@ -265,6 +275,30 @@ describe ('DeciderCombinator', () => {
         dc.tock();
 
         expect(dc.signals).to.have.lengthOf(0);
+
+        // first signal
+        dc.control_behavior.first_signal = {
+            type: SignalType.virtual,
+            name: 'signal-new',
+        };
+        dc.control_behavior.comparator = '>';
+        dc.control_behavior.second_signal = sigA;
+        dc.control_behavior.output_signal = sigA;
+
+        dc.tick();
+        dc.tock();
+
+        expect(dc.signals).to.deep.equal([{
+            signal: sigA,
+            count: -1,
+        }]);
+
+        dc.control_behavior.comparator = '<';
+
+        dc.tick();
+        dc.tock();
+
+        expect(dc.signals).to.have.lengthOf(0);
     });
 
     it('Should remove signals with a value of 0 from the output', () => {
@@ -277,6 +311,34 @@ describe ('DeciderCombinator', () => {
         dc.tock();
 
         expect(dc.signals).to.have.lengthOf(0);
+    });
+
+    it('Should transform all outputs to 1 when copy_count_from_input = false and output_signal is not "signal-each"', () => {
+        dc.control_behavior.first_signal = sigA;
+        dc.control_behavior.comparator = '<';
+        dc.control_behavior.second_signal = sigB;
+        dc.control_behavior.output_signal = { type: SignalType.virtual, name: 'signal-everything' };
+        dc.control_behavior.copy_count_from_input = false;
+
+        dc.tick();
+        dc.tock();
+
+        expect(dc.signals).to.deep.equal([
+            { signal: sigA, count: 1 },
+            { signal: sigC, count: 1 },
+            { signal: sigD, count: 1 },
+            { signal: sigE, count: 1 },
+            { signal: sigF, count: 1 },
+        ]);
+
+        dc.control_behavior.output_signal = sigA;
+
+        dc.tick();
+        dc.tock();
+
+        expect(dc.signals).to.deep.equal([
+            { signal: sigA, count: 1 },
+        ]);
     });
 
     it('Should output 1 on the specified non-special output signal if copy_count_from_input is false, even if that signal didnt exist in the inputs', () => {
@@ -382,34 +444,6 @@ describe ('DeciderCombinator', () => {
             { signal: sigD, count: 3 },
             { signal: sigE, count: 4 },
             { signal: sigF, count: 4 },
-        ]);
-    });
-
-    it('Should transform all outputs to 1 when copy_count_from_input = false and output_signal is not "signal-each"', () => {
-        dc.control_behavior.first_signal = sigA;
-        dc.control_behavior.comparator = '<';
-        dc.control_behavior.second_signal = sigB;
-        dc.control_behavior.output_signal = { type: SignalType.virtual, name: 'signal-everything' };
-        dc.control_behavior.copy_count_from_input = false;
-
-        dc.tick();
-        dc.tock();
-
-        expect(dc.signals).to.deep.equal([
-            { signal: sigA, count: 1 },
-            { signal: sigC, count: 1 },
-            { signal: sigD, count: 1 },
-            { signal: sigE, count: 1 },
-            { signal: sigF, count: 1 },
-        ]);
-
-        dc.control_behavior.output_signal = sigA;
-
-        dc.tick();
-        dc.tock();
-
-        expect(dc.signals).to.deep.equal([
-            { signal: sigA, count: 1 },
         ]);
     });
 
@@ -524,9 +558,48 @@ describe ('DeciderCombinator', () => {
         expect(dc.signals).to.deep.equal([{ signal: sigC, count: 1 }]);
     });
 
-    it('', () => {});
+    it('Should be chainable for fun and profit', () => {
+        dc.control_behavior.first_signal = { type: SignalType.virtual, name: 'signal-each' };
+        dc.control_behavior.comparator = '>';
+        dc.control_behavior.second_signal = sigC;
+        dc.control_behavior.output_signal = { type: SignalType.virtual, name: 'signal-each' };
 
-    it('', () => {});
+        let dc2 = new DeciderCombinator();
 
-    it('', () => {});
+        dc2.connections.push(dc);
+
+        dc2.control_behavior.first_signal = { type: SignalType.virtual, name: 'signal-each' };
+        dc2.control_behavior.comparator = '<';
+        dc2.control_behavior.constant = 4;
+        dc2.control_behavior.output_signal = { type: SignalType.virtual, name: 'signal-each' };
+        dc2.control_behavior.copy_count_from_input = true;
+
+        dc.tick();
+        dc2.tick();
+
+        dc.tock();
+        dc2.tock();
+
+        expect(dc.signals).to.deep.equal([
+            { signal: sigD, count: 3 },
+            { signal: sigE, count: 4 },
+            { signal: sigF, count: 4 },
+        ]);
+        expect(dc2.signals).to.deep.equal([]);
+
+        dc.tick();
+        dc2.tick();
+
+        dc.tock();
+        dc2.tock();
+
+        expect(dc.signals).to.deep.equal([
+            { signal: sigD, count: 3 },
+            { signal: sigE, count: 4 },
+            { signal: sigF, count: 4 },
+        ]);
+        expect(dc2.signals).to.deep.equal([
+            { signal: sigD, count: 3 },
+        ]);
+    });
 });
