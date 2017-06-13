@@ -4,7 +4,9 @@ import { SignalValueProvider } from './interfaces/SignalValueProvider';
 import { SignalType } from './interfaces/SignalType';
 import { Clockable } from './interfaces/Clockable';
 import { DeciderConditions } from './interfaces/DeciderConditions';
+import { ArithmeticConditions } from './interfaces/ArithmeticConditions';
 import { ComparisonFunction } from './interfaces/ComparisonFunction';
+import { MathFunction } from './interfaces/MathFunction';
 
 import { Circuit } from './Circuit';
 import * as _ from 'lodash';
@@ -47,6 +49,42 @@ const DeciderOperators: { [funcName: string]: ComparisonFunction } = {
     },
     '≠': (L: number, R: number): boolean => {
         return (L !== R);
+    },
+};
+
+const MathOperators: { [funcName: string]: MathFunction } = {
+    '+': (L: number, R: number): number => {
+        return Math.trunc(L + R);
+    },
+    '-': (L: number, R: number): number => {
+        return Math.trunc(L - R);
+    },
+    '*': (L: number, R: number): number => {
+        return Math.trunc(L * R);
+    },
+    '/': (L: number, R: number): number => {
+        return Math.trunc(L / R);
+    },
+    '^': (L: number, R: number): number => {
+        return Math.trunc(Math.pow(L, R));
+    },
+    '%': (L: number, R: number): number => {
+        return Math.trunc(L % R);
+    },
+    '>>': (L: number, R: number): number => {
+        return L >> R;
+    },
+    '<<': (L: number, R: number): number => {
+        return L << R;
+    },
+    'AND': (L: number, R: number): number => {
+        return L & R;
+    },
+    'OR': (L: number, R: number): number => {
+        return L | R;
+    },
+    'XOR': (L: number, R: number): number => {
+        return L ^ R;
     },
 };
 
@@ -246,6 +284,161 @@ export class DeciderCombinator extends Combinator {
                 }
             }
         }
+
+        this.signals = results;
+    }
+
+    // Constructor --------------------------------------------------
+    constructor () {
+        super();
+        this._snapshot = { valid: false };
+    }
+}
+
+export class ArithmeticCombinator extends Combinator {
+    // Properties --------------------------------------------------
+    // Public
+    public static Operations = MathOperators;
+
+    public control_behavior: ArithmeticConditions;
+
+    public get valid (): boolean {
+        // enforce all rules determining whether or not this is a valid set of inputs
+        if (this.control_behavior === undefined) {
+            return false;
+        }
+
+        // left-hand value
+        this.control_behavior;
+        if (this.control_behavior.first_signal === undefined
+            || this.control_behavior.first_signal.name === 'signal-everything'
+            || this.control_behavior.first_signal.name === 'signal-anything') {
+                return false;
+        }
+
+        // right-hand value
+        if ((this.control_behavior.second_signal === undefined && this.control_behavior.constant === undefined)
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-each')
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-everything')
+            || (this.control_behavior.second_signal !== undefined && this.control_behavior.second_signal.name === 'signal-anything')) {
+                return false;
+        }
+
+        // operation
+        if (this.control_behavior.operation === undefined
+            || !_.has(ArithmeticCombinator.Operations, this.control_behavior.operation)) {
+            return false;
+        }
+
+        // output value
+        if (this.control_behavior.output_signal === undefined
+            || this.control_behavior.output_signal.name === 'signal-anything'
+            || this.control_behavior.output_signal.name === 'signal-everything'
+            || (this.control_behavior.output_signal.name === 'signal-each' && this.control_behavior.first_signal.name !== 'signal-each')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Private
+    public _snapshot: {
+        valid: boolean,
+        input_signals?: Signal[];
+        first_signal?: SignalID;
+        second_signal?: SignalID;
+        constant?: number;
+        operation?: string;
+        output_signal?: SignalID;
+    };
+
+    // Methods --------------------------------------------------
+    public tick(): void {
+        if (!this.valid) {
+            this._snapshot = { valid: false };
+            return;
+        }
+
+        // capture state
+        this._snapshot.valid = true;
+        this._snapshot.first_signal = _.cloneDeep(this.control_behavior.first_signal);
+        this._snapshot.second_signal = _.cloneDeep(this.control_behavior.second_signal);
+        this._snapshot.output_signal = _.cloneDeep(this.control_behavior.output_signal);
+        this._snapshot.constant = this.control_behavior.constant;
+        this._snapshot.operation = this.control_behavior.operation;
+
+        // save input signal state
+        let merger = new Circuit();
+
+        merger.providers = this.connections;
+
+        this._snapshot.input_signals = _.cloneDeep(merger.signals);
+    }
+
+    public tock(): void {
+        if (!this._snapshot.valid) {
+            this.signals = [];
+            return;
+        }
+
+        let results: Signal[] = [];
+        let success = false;
+
+        let rhv: number;
+
+        if (this._snapshot.second_signal !== undefined) {
+            let rhv_signal = _.find(this._snapshot.input_signals, ['signal.name', this._snapshot.second_signal.name]);
+
+            rhv = rhv_signal !== undefined ? rhv_signal.count : 0;
+        }
+        else {
+            rhv = this._snapshot.constant;
+        }
+
+        // perform comparisons
+        switch (this._snapshot.first_signal.name) {
+            case('signal-each'): {
+                for (let signal of this._snapshot.input_signals) {
+                    signal.count = ArithmeticCombinator.Operations[this._snapshot.operation](signal.count, rhv);
+                    results.push(signal);
+                }
+                break;
+            }
+            default: {
+                let lhv_signal: Signal;
+
+                lhv_signal = _.find(this._snapshot.input_signals, ['signal.name', this._snapshot.first_signal.name]);
+
+                // treat missing signals as having a value of 0
+                if (lhv_signal === undefined) {
+                    lhv_signal = { signal: this._snapshot.first_signal, count: 0 };
+                }
+
+                lhv_signal.count = ArithmeticCombinator.Operations[this._snapshot.operation](lhv_signal.count, rhv);
+
+                results.push(lhv_signal);
+            }
+        }
+
+        // transform outputs
+        switch (this._snapshot.output_signal.name) {
+            case('signal-each'): {
+                break;
+            }
+            default: {
+                let value: number = results.reduce( (acc, result) => {
+                    return acc + result.count;
+                }, 0);
+
+                results = [{
+                    signal: this._snapshot.output_signal,
+                    count: value,
+                }];
+            }
+        }
+
+        // remove zeros
+        results = _.pullAllBy(results, [{ count: 0 }], 'count');
 
         this.signals = results;
     }
