@@ -62,7 +62,7 @@ describe ('DeciderCombinator', () => {
         expect(dc.valid).to.be.false;
         expect(dc.signals).to.have.lengthOf(0);
 
-        // right hand missing (no secon_signal or constant)
+        // right hand missing (no second_signal or constant)
         dc.control_behavior.first_signal = sigC;
         dc.control_behavior.second_signal = undefined;
 
@@ -623,7 +623,7 @@ describe('ArithmeticCombinator', () => {
         expect(ac.valid).to.be.false;
         expect(ac.signals).to.have.lengthOf(0);
 
-        // right hand missing (no secon_signal or constant)
+        // right hand missing (no second_signal or constant)
         ac.control_behavior.first_signal = sigC;
         ac.control_behavior.second_signal = undefined;
 
@@ -935,13 +935,139 @@ describe('ArithmeticCombinator', () => {
         }]);
     });
 
-    it('Should treat signals that don\'t exist as if they have a value of 0', () => {});
+    it('Should treat signals that don\'t exist as if they have a value of 0', () => {
+        // first signal doesnt exist in inputs
+        ac.control_behavior.first_signal = { type: SignalType.virtual, name: 'signal-new' };
+        ac.control_behavior.operation = '+';
+        ac.control_behavior.second_signal = sigD;
+        ac.control_behavior.output_signal = sigD;
 
-    it('Should remove signals with a value of 0 from the output', () => {});
+        ac.tick();
+        ac.tock();
 
-    it('Should perform the specified operations on all inputs when run with first_signal of "signal-each"', () => {});
+        expect(ac.signals).to.deep.equal([{
+            signal: sigD,
+            count: 3,
+        }])
 
-    it('Should sum all results with first_signal of "signal-each" and a non-special output signal', () => {});
+        // second signal doesnt exist in inputs
+        ac.control_behavior.first_signal = sigD;
+        ac.control_behavior.operation = '+';
+        ac.control_behavior.second_signal = { type: SignalType.virtual, name: 'signal-new' };
+        ac.control_behavior.output_signal = sigD;
 
-    it('Should only change its output on tock() regardless of other setting changes', () => {});
+        ac.tick();
+        ac.tock();
+
+        expect(ac.signals).to.deep.equal([{
+            signal: sigD,
+            count: 3,
+        }])
+    });
+
+    it('Should remove signals with a value of 0 from the output', () => {
+        ac.control_behavior.first_signal = sigD;
+        ac.control_behavior.operation = '-';
+        ac.control_behavior.second_signal = undefined;
+        ac.control_behavior.constant = 3;
+        ac.control_behavior.output_signal = sigD;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.signals).to.have.lengthOf(0);
+    });
+
+    it('Should perform the specified operations on all inputs when run with first_signal of "signal-each"', () => {
+        ac.control_behavior.first_signal = { type: SignalType.virtual, name: 'signal-each' };
+        ac.control_behavior.operation = '+';
+        ac.control_behavior.second_signal = undefined;
+        ac.control_behavior.constant = 100;
+        ac.control_behavior.output_signal = { type: SignalType.virtual, name: 'signal-each' };
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.signals).to.deep.equal([
+            { signal: sigA, count: 99 },
+            { signal: sigC, count: 102 },
+            { signal: sigD, count: 103 },
+            { signal: sigE, count: 104 },
+            { signal: sigF, count: 104 },
+        ])
+    });
+
+    it('Should sum all results with first_signal of "signal-each" and a non-special output signal', () => {
+        ac.control_behavior.first_signal = { type: SignalType.virtual, name: 'signal-each' };
+        ac.control_behavior.operation = '+';
+        ac.control_behavior.second_signal = undefined;
+        ac.control_behavior.constant = 100;
+        ac.control_behavior.output_signal = sigD;
+
+        ac.tick();
+        ac.tock();
+
+        expect(ac.signals).to.deep.equal([
+            { signal: sigD, count: 512 },
+        ])
+
+    });
+
+    it('Should only change its output on tock() regardless of other setting changes', () => {
+        let curSignals = _.cloneDeep(ac.signals);
+
+        ac.tick();
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tock();
+        expect(ac.signals).to.deep.equal([{ signal: sigA, count: -1 }]);
+        curSignals = _.cloneDeep(ac.signals);
+
+        // pre tick changes
+        // first_signal
+        ac.control_behavior.first_signal = sigC;
+
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tick();
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tock();
+        expect(ac.signals).to.deep.equal([{
+            signal: sigA,
+            count: 2,
+        }]);
+        curSignals = _.cloneDeep(ac.signals);
+
+        // second_signal
+        ac.control_behavior.second_signal = undefined;
+        ac.control_behavior.constant = -1;
+
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tick();
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tock();
+        expect(ac.signals).to.deep.equal([{
+            signal: sigA,
+            count: 1,
+        }]);
+        curSignals = _.cloneDeep(ac.signals);
+
+
+        // operation
+        ac.control_behavior.operation = '*';
+
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tick();
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tock();
+        expect(ac.signals).to.deep.equal([{ signal: sigA, count: -2 }]);
+        curSignals = _.cloneDeep(ac.signals);
+
+        // output_signal
+        ac.control_behavior.output_signal = sigC;
+
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tick();
+        expect(ac.signals).to.deep.equal(curSignals);
+        ac.tock();
+        expect(ac.signals).to.deep.equal([{ signal: sigC, count: -2 }]);
+    });
 })
